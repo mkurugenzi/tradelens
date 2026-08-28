@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import crypto from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
+    const supabaseAdmin: any = getSupabaseAdminClient();
     const { account_id } = await req.json();
     if (!account_id) {
       return NextResponse.json({ error: 'account_id is required' }, { status: 400 });

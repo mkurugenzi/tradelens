@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import type { IncomingTradePayload, SyncPayload, SyncResponse, TradeDirection } from '@/lib/types';
 
 export async function POST(req: NextRequest) {
   try {
+    const supabaseAdmin: any = getSupabaseAdminClient();
     const authHeader = req.headers.get('authorization');
     const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7).trim() : null;
 
