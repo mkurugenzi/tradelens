@@ -13,18 +13,20 @@ import {
   Sparkles,
   Settings,
   LineChart,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'AI Analyst', href: '/dashboard/ai-analyst', icon: Sparkles },
+  { label: 'Journal', href: '/dashboard/journal', icon: BookOpen },
+  { label: 'Analytics', href: '/dashboard/analytics', icon: TrendingUp },
   { label: 'Trades', href: '/dashboard/trades', icon: ListOrdered },
   { label: 'Markets', href: '/dashboard/markets', icon: BarChart3 },
-  { label: 'Analytics', href: '/dashboard/analytics', icon: TrendingUp },
   { label: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
   { label: 'Drawdown', href: '/dashboard/drawdown', icon: TrendingDown },
   { label: 'Connections', href: '/dashboard/connections', icon: Plug },
-  { label: 'AI Analyst', href: '/dashboard/ai-analyst', icon: Sparkles },
   { label: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 

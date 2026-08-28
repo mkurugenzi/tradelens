@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { useApp } from '@/lib/app-context';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
@@ -24,23 +25,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, LogOut, User as UserIcon, Settings, Plus, Eye, X } from 'lucide-react';
+import { ChevronDown, LogOut, User as UserIcon, Settings, Plus, Eye, X, Sun, Moon } from 'lucide-react';
 import Link from 'next/link';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const {
     isDemo,
     accounts,
     activeAccountId,
     setActiveAccountId,
     setViewMode,
-    setLiveAccounts,
+    refreshAccounts,
   } = useApp();
 
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isDemo) {
@@ -52,40 +59,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    let cancelled = false;
-    (async () => {
-      const { data: accountRows } = await supabase
-        .from('trading_accounts')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (cancelled || !accountRows) return;
-
-      const accs: TradingAccount[] = accountRows as TradingAccount[];
-      const tradesMap = new Map<string, Trade[]>();
-
-      for (const acc of accs) {
-        const { data: tradeRows } = await supabase
-          .from('trades')
-          .select('*')
-          .eq('account_id', acc.id)
-          .order('close_time', { ascending: true });
-        tradesMap.set(acc.id, (tradeRows as Trade[]) ?? []);
-      }
-
-      if (cancelled) return;
-      setLiveAccounts(accs, tradesMap);
-      if (accs.length > 0 && !activeAccountId) {
-        setActiveAccountId(accs[0].id);
-      }
+    refreshAccounts().finally(() => {
       setLoading(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isDemo]);
+    });
+  }, [user, isDemo, refreshAccounts]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -183,6 +160,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {mounted && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+              >
+                {theme === 'dark' ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+              </Button>
+            )}
             {isDemo && (
               <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 md:hidden">
                 DEMO

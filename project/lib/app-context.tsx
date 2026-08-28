@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, ReactNode, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
 import type { TradingAccount, Trade, TradeFilters } from './types';
 import { DEMO_DATA } from './demo-data';
+import { supabase } from './supabase';
 
 type ViewMode = 'demo' | 'live';
 
@@ -20,6 +21,7 @@ interface AppContextValue {
   setViewMode: (mode: ViewMode) => void;
   refreshAccounts: () => Promise<void>;
   setLiveAccounts: (accounts: TradingAccount[], tradesMap: Map<string, Trade[]>) => void;
+  updateTradeJournal: (tradeId: string, notes: string, tags: string[]) => Promise<void>;
 }
 
 const defaultFilters: TradeFilters = {
@@ -50,6 +52,7 @@ const AppContext = createContext<AppContextValue>({
   setViewMode: () => {},
   refreshAccounts: async () => {},
   setLiveAccounts: () => {},
+  updateTradeJournal: async () => {},
 });
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -78,14 +81,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [isDemo, liveTradesMap]);
 
   const activeAccount = useMemo(
-    () => accounts.find((a) => a.id === activeAccountId) ?? null,
+    () => accounts.find((a) => a.id === activeAccountId) ?? accounts[0] ?? null,
     [accounts, activeAccountId]
   );
 
   const activeTrades = useMemo(() => {
-    if (!activeAccountId) return [];
-    return allAccountTrades.get(activeAccountId) ?? [];
-  }, [activeAccountId, allAccountTrades]);
+    if (!activeAccount) return [];
+    return allAccountTrades.get(activeAccount.id) ?? [];
+  }, [activeAccount, allAccountTrades]);
 
   const setLiveAccountsData = useCallback(
     (accs: TradingAccount[], tradesMap: Map<string, Trade[]>) => {
@@ -96,9 +99,89 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshAccounts = useCallback(async () => {
-    // This will be called by the dashboard to reload from Supabase
-    // The actual fetch happens in the dashboard component
-  }, []);
+    if (isDemo) return;
+
+    try {
+      const { data: accountRows } = await supabase
+        .from('trading_accounts')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (!accountRows) return;
+
+      const accs: TradingAccount[] = accountRows as TradingAccount[];
+      const tradesMap = new Map<string, Trade[]>();
+
+      for (const acc of accs) {
+        const { data: tradeRows } = await supabase
+          .from('trades')
+          .select('*')
+          .eq('account_id', acc.id)
+          .order('close_time', { ascending: true });
+        tradesMap.set(acc.id, (tradeRows as Trade[]) ?? []);
+      }
+
+      setLiveAccountsState(accs);
+      setLiveTradesMap(tradesMap);
+
+      if (accs.length > 0) {
+        setActiveAccountId((prev) => {
+          if (prev && accs.some((a) => a.id === prev)) return prev;
+          return accs[0].id;
+        });
+      } else {
+        setActiveAccountId(null);
+      }
+    } catch (err) {
+      console.error('Failed to refresh accounts:', err);
+    }
+  }, [isDemo]);
+
+  const updateTradeJournal = useCallback(
+    async (tradeId: string, notes: string, tags: string[]) => {
+      if (isDemo) {
+        // Update in-memory for demo mode
+        setLiveTradesMap((prev) => {
+          const newMap = new Map(prev);
+          for (const [accId, trades] of newMap.entries()) {
+            const index = trades.findIndex((t) => t.id === tradeId);
+            if (index !== -1) {
+              const updatedTrades = [...trades];
+              updatedTrades[index] = { ...updatedTrades[index], notes, tags, comment: notes || updatedTrades[index].comment };
+              newMap.set(accId, updatedTrades);
+            }
+          }
+          return newMap;
+        });
+        return;
+      }
+
+      // Update in Supabase
+      try {
+        await supabase
+          .from('trades')
+          .update({ comment: notes, notes, tags })
+          .eq('id', tradeId);
+
+        // Optimistically update local trades map
+        setLiveTradesMap((prev) => {
+          const newMap = new Map(prev);
+          for (const [accId, trades] of newMap.entries()) {
+            const index = trades.findIndex((t) => t.id === tradeId);
+            if (index !== -1) {
+              const updatedTrades = [...trades];
+              updatedTrades[index] = { ...updatedTrades[index], notes, tags, comment: notes || updatedTrades[index].comment };
+              newMap.set(accId, updatedTrades);
+            }
+          }
+          return newMap;
+        });
+      } catch (err) {
+        console.error('Failed to update trade journal:', err);
+      }
+    },
+    [isDemo]
+  );
 
   const value: AppContextValue = {
     viewMode,
@@ -114,6 +197,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setViewMode,
     refreshAccounts,
     setLiveAccounts: setLiveAccountsData,
+    updateTradeJournal,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

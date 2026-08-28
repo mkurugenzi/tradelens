@@ -38,7 +38,7 @@ const TRADE_FIELDS = [
 type Step = 'upload' | 'map' | 'preview' | 'importing' | 'done';
 
 export default function ImportPage() {
-  const { isDemo, accounts, activeAccountId, setLiveAccounts, allAccountTrades } = useApp();
+  const { isDemo, accounts, activeAccountId, allAccountTrades, refreshAccounts } = useApp();
   const { user } = useAuth();
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
@@ -84,10 +84,9 @@ export default function ImportPage() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = String(e.target?.result ?? '');
-      const lines = text.split('\n').filter((l) => l.trim());
-      if (lines.length === 0) return;
-      const parsedHeaders = lines[0].split(/[,\t;]/).map((h) => h.trim().replace(/"/g, ''));
-      const parsedRows = lines.slice(1, 101).map((l) => l.split(/[,\t;]/).map((c) => c.trim().replace(/"/g, '')));
+      const isHtml = /<table[\s>]/i.test(text) || /\.html?$/i.test(f.name);
+      const { parsedHeaders, parsedRows } = isHtml ? parseHtmlTable(text) : parseDelimitedText(text);
+      if (parsedHeaders.length === 0) return;
       setHeaders(parsedHeaders);
       setRows(parsedRows);
 
@@ -106,6 +105,24 @@ export default function ImportPage() {
       setStep('map');
     };
     reader.readAsText(f);
+  };
+
+  const parseDelimitedText = (text: string): { parsedHeaders: string[]; parsedRows: string[][] } => {
+    const lines = text.split(/\r?\n/).filter((line) => line.trim());
+    if (lines.length === 0) return { parsedHeaders: [], parsedRows: [] };
+    const splitLine = (line: string) => line.split(/[,\t;]/).map((cell) => cell.trim().replace(/^"|"$/g, ''));
+    return { parsedHeaders: splitLine(lines[0]), parsedRows: lines.slice(1, 101).map(splitLine) };
+  };
+
+  const parseHtmlTable = (text: string): { parsedHeaders: string[]; parsedRows: string[][] } => {
+    const parser = new DOMParser();
+    const document = parser.parseFromString(text, 'text/html');
+    const table = document.querySelector('table');
+    const tableRows = table ? Array.from(table.querySelectorAll('tr')) : [];
+    const values = tableRows.map((row) =>
+      Array.from(row.querySelectorAll('th, td')).map((cell) => cell.textContent?.replace(/\s+/g, ' ').trim() ?? '')
+    ).filter((row) => row.length > 0);
+    return { parsedHeaders: values[0] ?? [], parsedRows: values.slice(1, 101) };
   };
 
   const validateRow = (row: string[], map: Record<string, string>): { valid: boolean; trade?: Partial<Trade>; error?: string } => {
@@ -233,6 +250,8 @@ export default function ImportPage() {
         failed_rows: failed.length,
         duplicate_rows: duplicates.length,
       });
+
+      await refreshAccounts();
     }
 
     setImportResult({
@@ -259,7 +278,7 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Import Trades" description="Import your MT4 or MT5 trade history from a CSV file" />
+      <PageHeader title="Import Trades" description="Import your MT4 or MT5 trade history" />
 
       {step === 'upload' && (
         <Card>
@@ -271,9 +290,9 @@ export default function ImportPage() {
               onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
             >
               <Upload className="h-10 w-10 text-muted-foreground/40 mx-auto mb-4" />
-              <h3 className="font-medium mb-1">Drop your CSV file here</h3>
-              <p className="text-sm text-muted-foreground mb-4">or click to browse — MT4 and MT5 export formats supported</p>
-              <input id="csv-upload" type="file" accept=".csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+              <h3 className="font-medium mb-1">Drop your MT4 or MT5 report here</h3>
+              <p className="text-sm text-muted-foreground mb-4">or click to browse — CSV, HTML, and XML reports supported</p>
+              <input id="csv-upload" type="file" accept=".csv,.htm,.html,.xml,text/csv,text/html,application/xml" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
             </div>
             <div className="mt-4 text-xs text-muted-foreground">
               <p className="mb-1">To export from MetaTrader:</p>

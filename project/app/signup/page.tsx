@@ -18,6 +18,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [confirmationSent, setConfirmationSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,12 +30,19 @@ export default function SignupPage() {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) {
       setError(error.message);
       setLoading(false);
       return;
     }
+
+    if (!data.session) {
+      setConfirmationSent(true);
+      setLoading(false);
+      return;
+    }
+
     router.push('/dashboard');
   };
 
@@ -53,64 +61,93 @@ export default function SignupPage() {
       </Link>
 
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Start analyzing</CardTitle>
-          <CardDescription>Create your free TradeLens account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-9"
-                  required
-                />
+        {confirmationSent ? (
+          <>
+            <CardHeader className="text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-2">
+                <Mail className="h-6 w-6" />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="At least 6 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-9"
-                  required
-                />
+              <CardTitle className="text-xl">Check your inbox</CardTitle>
+              <CardDescription>
+                We sent a confirmation link to <span className="font-semibold text-foreground">{email}</span>. Please verify your email to log in.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button asChild className="w-full">
+                <Link href="/login">Go to Login</Link>
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={() => setConfirmationSent(false)}>
+                Back to Sign Up
+              </Button>
+            </CardContent>
+          </>
+        ) : (
+          <>
+            <CardHeader>
+              <CardTitle className="text-2xl">Start analyzing</CardTitle>
+              <CardDescription>Create your free TradeLens account</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-9"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="At least 6 characters"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-9"
+                      required
+                    />
+                  </div>
+                </div>
+                {error && (
+                  <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+                    {error}
+                  </div>
+                )}
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Creating account...' : 'Create Account'}
+                  {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
+                </Button>
+              </form>
+              <div className="mt-4 text-center text-sm text-muted-foreground">
+                Already have an account?{' '}
+                <Link href="/login" className="text-primary hover:underline font-medium">
+                  Sign in
+                </Link>
               </div>
-            </div>
-            {error && (
-              <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
-                {error}
+              <div className="mt-2 text-center text-xs text-muted-foreground">
+                Or explore first with{' '}
+                <button
+                  type="button"
+                  onClick={startDemo}
+                  className="text-primary hover:underline font-medium"
+                >
+                  Demo Mode
+                </button>
               </div>
-            )}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Creating account...' : 'Create Account'}
-              {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
-            </Button>
-          </form>
-          <div className="mt-4 text-center text-sm text-muted-foreground">
-            Already have an account?{' '}
-            <Link href="/login" className="text-foreground font-medium hover:underline">
-              Sign in
-            </Link>
-          </div>
-          <div className="mt-4 pt-4 border-t border-border text-center">
-            <button onClick={startDemo} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Or explore the demo — no signup needed
-            </button>
-          </div>
-        </CardContent>
+            </CardContent>
+          </>
+        )}
       </Card>
     </div>
   );

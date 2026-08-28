@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   title: 'TradeLens — Understand Every Trade',
   description:
     'Turn your MT4 and MT5 trading history into clear performance insights. Import, analyze, and visualize your trading performance with TradeLens.',
+  icons: {
+    icon: '/favicon.svg',
+  },
   openGraph: {
     title: 'TradeLens — Understand Every Trade',
     description:

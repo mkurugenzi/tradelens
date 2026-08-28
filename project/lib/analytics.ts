@@ -224,14 +224,14 @@ export function calculateSymbolAnalytics(trades: Trade[]): SymbolAnalytics[] {
   }
 
   const results: SymbolAnalytics[] = [];
-  for (const [symbol, symbolTrades] of groups) {
-    const wins = symbolTrades.filter((t) => t.net_profit > 0);
-    const losses = symbolTrades.filter((t) => t.net_profit < 0);
-    const grossProfit = wins.reduce((s, t) => s + t.net_profit, 0);
-    const grossLoss = Math.abs(losses.reduce((s, t) => s + t.net_profit, 0));
-    const netProfit = symbolTrades.reduce((s, t) => s + t.net_profit, 0);
-    const totalVolume = symbolTrades.reduce((s, t) => s + t.volume, 0);
-    const avgDuration = symbolTrades.reduce((s, t) => s + t.duration_minutes, 0) / symbolTrades.length;
+  for (const [symbol, symbolTrades] of Array.from(groups.entries())) {
+    const wins = symbolTrades.filter((t: Trade) => t.net_profit > 0);
+    const losses = symbolTrades.filter((t: Trade) => t.net_profit < 0);
+    const grossProfit = wins.reduce((s: number, t: Trade) => s + t.net_profit, 0);
+    const grossLoss = Math.abs(losses.reduce((s: number, t: Trade) => s + t.net_profit, 0));
+    const netProfit = symbolTrades.reduce((s: number, t: Trade) => s + t.net_profit, 0);
+    const totalVolume = symbolTrades.reduce((s: number, t: Trade) => s + t.volume, 0);
+    const avgDuration = symbolTrades.reduce((s: number, t: Trade) => s + (t.duration_minutes || 0), 0) / symbolTrades.length;
 
     results.push({
       symbol,
@@ -241,8 +241,8 @@ export function calculateSymbolAnalytics(trades: Trade[]): SymbolAnalytics[] {
       averageProfit: wins.length > 0 ? grossProfit / wins.length : 0,
       averageLoss: losses.length > 0 ? grossLoss / losses.length : 0,
       profitFactor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0,
-      largestWin: wins.length > 0 ? Math.max(...wins.map((t) => t.net_profit)) : 0,
-      largestLoss: losses.length > 0 ? Math.min(...losses.map((t) => t.net_profit)) : 0,
+      largestWin: wins.length > 0 ? Math.max(...wins.map((t: Trade) => t.net_profit)) : 0,
+      largestLoss: losses.length > 0 ? Math.min(...losses.map((t: Trade) => t.net_profit)) : 0,
       averageDuration: avgDuration,
       totalVolume,
     });
